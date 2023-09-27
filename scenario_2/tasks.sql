@@ -1,0 +1,167 @@
+USE HR_Database;
+
+-- 1: Write the query that returns the list of employees still working in our company.
+-- Note: Those with null outdates are employees who continue to work.
+
+
+SELECT * FROM PERSON
+WHERE OUTDATE IS NULL;
+
+-- 2: Write the query that returns the numbers of WOMEN and MEN still working on a departmental basis in our company.
+
+SELECT D.DEPARTMENT,
+CASE
+	WHEN P.GENDER = 'E' THEN 'ERKEK'  -- ERKEK: MALE
+	WHEN P.GENDER = 'K' THEN 'KADIN'  -- KADIN: FEMALE
+END AS GENDER
+, COUNT(P.ID) AS EMPLOYEECOUNT FROM PERSON P
+INNER JOIN DEPARTMENT D ON P.DEPARTMENTID = D.ID
+WHERE OUTDATE IS NULL
+GROUP BY D.DEPARTMENT , p.GENDER
+ORDER BY D.DEPARTMENT ASC;
+
+-- 3: Write the query that brings up the numbers of WOMEN and MEN currently available on a departmental basis in our company.
+
+SELECT D.DEPARTMENT,
+(SELECT COUNT(*) FROM PERSON WHERE DEPARTMENTID = D.ID AND GENDER='E' AND OUTDATE IS NULL) AS MALE_PERSONENCOUNT,
+(SELECT COUNT(*) FROM PERSON WHERE DEPARTMENTID = D.ID AND GENDER='K' AND OUTDATE IS NULL) AS FEMALE_PERSONENCOUNT,
+(SELECT COUNT(*) FROM PERSON WHERE DEPARTMENTID = D.ID AND OUTDATE IS NULL) AS TOTAL_PERSONENCOUNT
+FROM DEPARTMENT D
+ORDER BY 1 ASC;
+
+
+-- 4: A new chief has been appointed to the Planning department of our company and we would like to determine his salary. 
+-- Write the query that returns the minimum, maximum and average chef salaries for the planning department?
+-- (Note: Salaries of personnel who are out of employment are also included.)
+
+SELECT POS.POSITION, 
+MIN(P.SALARY) AS MINSALARY,
+MAX(P.SALARY) AS MAXSALARY,
+ROUND(AVG(P.SALARY),0) AS AVGSALARY
+FROM PERSON P
+INNER JOIN POSITION POS ON P.POSITIONID = POS.ID
+WHERE POS.POSITION LIKE 'PLANLAMA SEFI'
+GROUP BY POS.POSITION;
+
+
+-- 5: We would like to list how many people are currently employed in each position and what their average salaries are. 
+-- Write the query that returns this result.
+
+SELECT POS.POSITION, COUNT(P.ID) PERSONCOUNT, ROUND(AVG(P.SALARY),0) AVGSALARY 
+FROM PERSON P
+INNER JOIN POSITION POS ON P.POSITIONID = POS.ID
+WHERE OUTDATE IS NULL
+GROUP BY POS.POSITION;
+
+SELECT POSITION,
+(SELECT COUNT(*) FROM PERSON WHERE POSITIONID = POS.ID AND OUTDATE IS NULL) AS PERSONCOUNT,
+(SELECT ROUND(AVG(SALARY),0) FROM PERSON WHERE POSITIONID = POS.ID AND OUTDATE IS NULL) AS AVGSALARY
+FROM POSITION POS
+ORDER BY 1;
+
+-- 6: Write the query that returns the number of personnel employed as men and women by year.
+
+SELECT 
+YEAR(INDATE),
+(SELECT COUNT(*) FROM PERSON P WHERE GENDER='E' AND YEAR(P.INDATE) = YEAR(PP.INDATE)) AS MALE_PERSON,
+(SELECT COUNT(*) FROM PERSON P WHERE GENDER='K' AND YEAR(P.INDATE) = YEAR(PP.INDATE)) AS FEMALE_PERSON
+FROM PERSON PP
+GROUP BY YEAR(INDATE)
+ORDER BY 1;
+
+
+-- 7: Write a query that returns how long each of our staff has been working, in months.
+
+SELECT CONCAT(NAME_,' ',SURNAME) AS PERSON, 
+INDATE, 
+OUTDATE,
+CASE
+	WHEN OUTDATE IS NOT NULL THEN DATEDIFF(MONTH,INDATE,OUTDATE)
+	ELSE DATEDIFF(MONTH,INDATE,GETDATE())
+END AS WORKINGTIME
+FROM PERSON;
+
+
+SELECT CONCAT(NAME_,' ',SURNAME) AS PERSON, 
+INDATE, 
+OUTDATE,
+DATEDIFF(MONTH,INDATE,GETDATE()) AS WORKINGTIME
+FROM PERSON
+WHERE OUTDATE IS NULL
+
+UNION ALL
+
+SELECT CONCAT(NAME_,' ',SURNAME) AS PERSON, 
+INDATE, 
+OUTDATE,
+DATEDIFF(MONTH,INDATE,OUTDATE) AS WORKINGTIME
+FROM PERSON
+WHERE OUTDATE IS NOT NULL
+;
+
+
+-- 8: In its 5th year, our company will print an agenda with everyone's name and surname 
+-- initials on it and give it to employees as a gift. To do this, write the query that answers 
+-- the question of how many agendas will be printed using which letter combination.
+-- Note: For those with two names, the first letter of the first name will be used.
+
+SELECT 
+	CONCAT(LEFT(NAME_,1),'.',LEFT(SURNAME,1),'.') SHORTNAME, 
+	COUNT(ID) PERSONCOUNT
+FROM PERSON
+GROUP BY CONCAT(LEFT(NAME_,1),'.',LEFT(SURNAME,1),'.');
+
+SELECT 
+	SUBSTRING(NAME_,1,1)+'.'+SUBSTRING(SURNAME,1,1)+'.' SHORTNAME, 
+	COUNT(ID) PERSONCOUNT
+FROM PERSON
+GROUP BY SUBSTRING(NAME_,1,1)+'.'+SUBSTRING(SURNAME,1,1)+'.';
+
+
+-- 9: Write a query that will list departments with an average salary of more than 5,500 TL.
+
+SELECT D.DEPARTMENT, ROUND(AVG(P.SALARY),0) AVG_SALARY FROM PERSON P
+INNER JOIN DEPARTMENT D ON P.DEPARTMENTID = D.ID 
+GROUP BY D.DEPARTMENT
+HAVING AVG(P.SALARY) > 5500
+;
+
+
+SELECT DEPARTMENT,
+(SELECT ROUND(AVG(SALARY),0) FROM PERSON WHERE D.ID = DEPARTMENTID) AS AVG_SALARY
+FROM DEPARTMENT D
+WHERE (SELECT ROUND(AVG(SALARY),0) FROM PERSON WHERE D.ID = DEPARTMENTID)>5500;
+
+
+-- 10: Write a query that will calculate and retrieve the average seniority of the departments in months.
+
+
+SELECT DEPARTMENT, AVG(WORKINGTIME)
+FROM
+(
+SELECT D.DEPARTMENT,
+	CASE 
+		WHEN OUTDATE IS NOT NULL THEN DATEDIFF(MONTH,INDATE,OUTDATE)
+		ELSE DATEDIFF(MONTH,INDATE,GETDATE())
+	END AS WORKINGTIME
+FROM PERSON P
+INNER JOIN DEPARTMENT D ON D.ID = P.DEPARTMENTID
+) T 
+GROUP BY DEPARTMENT
+ORDER BY 1
+
+
+-- 11: Write a query that returns the name and position of each employee and the name and 
+-- position of the unit manager to whom he/she is affiliated.
+
+
+
+
+SELECT P.NAME_+' '+P.SURNAME AS PERSON, 
+POS.POSITION AS POSITION,
+P2.NAME_+' '+P2.SURNAME AS MANAGER,
+POS2.POSITION
+FROM PERSON P
+INNER JOIN POSITION POS ON P.POSITIONID = POS.ID
+INNER JOIN PERSON P2 ON P.CODE = P2.ID
+INNER JOIN POSITION POS2 ON P2.POSITIONID = POS2.ID
